@@ -3,11 +3,16 @@ import string
 
 from hashlib import sha512
 from base64 import b64encode
+from secrets import token_urlsafe
+from time import time
 
 PSW_FILE = "./psw/login.csv"
+COOKIE_FILE = "./psw/cookies.csv"
+SALT_LEN = 8
+COOKIE_LEN = 16
 
 def randomStr(len):
-    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(len))
+    return token_urlsafe(len)
 
 def hash(stri,salt):
     mm = sha512()
@@ -18,12 +23,20 @@ def pswLineShoudBe(username,passowrd,salt):
     return (b"\n" + b64encode(username.encode()) + b","+ b64encode(hash(passowrd,salt).encode()) + b"," + salt.encode()).decode()
 
 def createUser(username,passowrd):
-    salt = randomStr(8)
+    salt = randomStr(SALT_LEN)
     with open(PSW_FILE, "a") as myfile:
         myfile.write(pswLineShoudBe(username, passowrd, salt))
 
-def login(username, password):
+def writeCookie(username:str) -> str:
+    cookie = b64encode(randomStr(COOKIE_LEN).encode()).decode()
+    with open(COOKIE_FILE,"a") as ff:
+            ff.write("\n" + b64encode(username.encode()).decode() + "," + cookie + "," + str(round(time())))
+    return cookie
+
+def login(username:str, password:str) -> (bool,str):
     pswFileContent = ""
+    success = False
+    cookie = ""
     with open(PSW_FILE, "r") as ff:
         pswFileContent = ff.read()
     for line in pswFileContent.split("\n"):
@@ -32,6 +45,21 @@ def login(username, password):
         fileUsername, b, salt = line.split(",")
 
         if b64encode(username.encode()).decode() == fileUsername and pswLineShoudBe(username, password, salt)[1:] == line:
-            print("authenticatoin sucseeded")
+            success = True
+            cookie = writeCookie(username)
+            break
 
-    return 123
+    return (success,cookie)
+
+def isLoggedIn(username:str, cookie:str) -> bool:
+    cookieFileContent = ""
+    retVal = False
+    with open(COOKIE_FILE, "r") as ff:
+        cookieFileContent = ff.read()
+    for line in cookieFileContent.split("\n"):
+        if line.count(",") != 2:
+            continue
+        fileUsername, fileCookie, timeStamp = line.split(",")
+        if b64encode(username.encode()).decode() == fileUsername and cookie == fileCookie:
+            retVal = True
+    return retVal

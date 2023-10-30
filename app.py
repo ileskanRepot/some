@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse, Response
+from fastapi import Cookie, FastAPI, Form
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from starlette.status import HTTP_302_FOUND,HTTP_303_SEE_OTHER
 
-from login import login
+from login import login, isLoggedIn
 
 app = FastAPI()
 
@@ -36,8 +37,13 @@ async def loginGet():
 
 @app.post("/login")
 async def loginPost(username: Annotated[str, Form()],password: Annotated[str, Form()]):
-    data = ""
-    return login(username, password)
+    loginStatus,cookie = login(username, password)
+    if not loginStatus:
+        return RedirectResponse("/login",status_code=HTTP_302_FOUND)
+    retVal = RedirectResponse("/",status_code=HTTP_302_FOUND)
+    retVal.set_cookie(key="cookie",value=cookie)
+    retVal.set_cookie(key="username",value=username)
+    return retVal
     
 
 @app.get("/login.css")
@@ -46,3 +52,10 @@ async def loginCSS():
     with open(staticPath + "/login.css", "r")as ff:
         data = ff.read()
     return Response(content = data, media_type = CSS_MEDIA_TYPE)
+
+@app.get("/secret")
+async def secret(username: str = Cookie(default = ""),cookie: str = Cookie(default = "")):
+    if not isLoggedIn(username,cookie):
+        return Response(content = "NOT AUTENTICATED", media_type = HTML_MEDIA_TYPE)
+    
+    return Response(content = "YOU GOT SECRET", media_type = HTML_MEDIA_TYPE)
