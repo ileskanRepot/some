@@ -10,6 +10,7 @@ PSW_FILE = "./psw/login.csv"
 COOKIE_FILE = "./psw/cookies.csv"
 SALT_LEN = 8
 COOKIE_LEN = 16
+SESSION_LEN = 60 * 0.1 # In seconds
 
 def randomStr(len):
     return token_urlsafe(len)
@@ -51,7 +52,28 @@ def login(username:str, password:str) -> (bool,str):
 
     return (success,cookie)
 
+def updateTime(username:str,cookie:str)-> None:
+    cookieFileContent = ""
+    with open(COOKIE_FILE, "r") as ff:
+        cookieFileContent = ff.read()
+
+    tmpContent = cookieFileContent.split("\n")
+    for ii,line in enumerate(tmpContent):
+        if line.count(",") != 2:
+            continue
+        fileUsername, fileCookie, timeStamp = line.split(",")
+        print(fileCookie)
+        print(cookie)
+        if b64encode(username.encode()).decode() != fileUsername or cookie != fileCookie:
+            continue
+        tmpContent[ii] = b64encode(username.encode()).decode() + "," + cookie + "," + str(round(time()))
+        break
+    with open(COOKIE_FILE, "w") as ff:
+        ff.write("\n".join(tmpContent))
+        # cookieFileContent = ff.read()
+
 def isLoggedIn(username:str, cookie:str) -> bool:
+    clearOldCookies()
     cookieFileContent = ""
     retVal = False
     with open(COOKIE_FILE, "r") as ff:
@@ -60,6 +82,26 @@ def isLoggedIn(username:str, cookie:str) -> bool:
         if line.count(",") != 2:
             continue
         fileUsername, fileCookie, timeStamp = line.split(",")
-        if b64encode(username.encode()).decode() == fileUsername and cookie == fileCookie:
+        if b64encode(username.encode()).decode() == fileUsername and cookie == fileCookie and int(timeStamp) > round(time()) - SESSION_LEN:
+            updateTime(username, cookie)
             retVal = True
     return retVal
+
+def clearOldCookies() -> None:
+    cookieFileContent = ""
+    with open(COOKIE_FILE, "r") as ff:
+        cookieFileContent = ff.read()
+
+    writeBack = []
+    for ii,line in enumerate(cookieFileContent.split("\n")):
+        if line.count(",") != 2:
+            continue
+        fileUsername, fileCookie, timeStamp = line.split(",")
+        if int(timeStamp) < round(time()) - SESSION_LEN:
+            continue
+        writeBack.append(fileUsername + "," + fileCookie + "," + timeStamp)
+        break
+    print(writeBack)
+
+    with open(COOKIE_FILE, "w") as ff:
+        ff.write("\n".join(writeBack))
