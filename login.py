@@ -10,7 +10,7 @@ PSW_FILE = "./psw/login.csv"
 COOKIE_FILE = "./psw/cookies.csv"
 SALT_LEN = 8
 COOKIE_LEN = 16
-SESSION_LEN = 60 * 0.1 # In seconds
+SESSION_LEN = 60 * 5 # In seconds
 
 def randomStr(len):
     return token_urlsafe(len)
